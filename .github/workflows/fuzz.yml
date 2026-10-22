@@ -10,6 +10,7 @@ permissions: {}
 
 jobs:
   fuzz:
+    if: github.repository == 'corazawaf/coraza'
     name: Fuzz tests
     runs-on: ubuntu-latest
     permissions:

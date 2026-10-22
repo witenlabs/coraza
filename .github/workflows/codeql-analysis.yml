@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   analyze:
+    if: github.repository == 'corazawaf/coraza'
     name: Analyze
     runs-on: ubuntu-latest
     permissions:

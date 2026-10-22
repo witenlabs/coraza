@@ -1,11 +1,13 @@
 // Copyright 2022 Juan Pablo Tosso and the OWASP Coraza contributors
 // SPDX-License-Identifier: Apache-2.0
+// Modified by Witen Labs in 2026: cover audit sink write error propagation.
 
 //go:build !tinygo
 
 package auditlog
 
 import (
+	"errors"
 	"io"
 	"io/fs"
 	"os"
@@ -113,5 +115,19 @@ func TestSerialWriterWrites(t *testing.T) {
 
 	if err := writer.Close(); err != nil {
 		t.Errorf("unexpected error: %s", err.Error())
+	}
+}
+
+type failingAuditSink struct{ err error }
+
+func (s failingAuditSink) Write([]byte) (int, error) { return 0, s.err }
+
+// Not a profile: this tests the writer's I/O error contract, not rule semantics.
+func TestSerialWriterReportsSinkFailure(t *testing.T) {
+	want := errors.New("audit sink unavailable")
+	w := &serialWriter{formatter: &jsonFormatter{}}
+	w.logger.SetOutput(failingAuditSink{err: want})
+	if err := w.Write(&Log{}); !errors.Is(err, want) {
+		t.Fatalf("write error = %v, want %v", err, want)
 	}
 }

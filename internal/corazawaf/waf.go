@@ -1,5 +1,6 @@
 // Copyright 2022 Juan Pablo Tosso and the OWASP Coraza contributors
 // SPDX-License-Identifier: Apache-2.0
+// Modified by Witen Labs in 2026: retire audit writers after active transactions drain.
 
 package corazawaf
 
@@ -169,6 +170,12 @@ type WAF struct {
 	memoizerID uint64
 	memoizer   *memoize.Memoizer
 	closeOnce  gosync.Once
+	// The connector may retire a generation while its requests are still logging.
+	lifecycleMu        gosync.Mutex
+	activeTransactions int
+	closing            bool
+	auditWriterClosed  bool
+	closeErr           error
 }
 
 // Options is used to pass options to the WAF instance
@@ -202,6 +209,9 @@ func (w *WAF) NewTransactionWithOptions(opts Options) *Transaction {
 // NewTransactionWithID Creates a new initialized transaction for this WAF instance
 // Using the specified ID
 func (w *WAF) newTransaction(opts Options) *Transaction {
+	w.lifecycleMu.Lock()
+	w.activeTransactions++
+	w.lifecycleMu.Unlock()
 	tx := w.txPool.Get().(*Transaction)
 	tx.id = opts.ID
 	tx.context = opts.Context
@@ -493,12 +503,37 @@ func (w *WAF) Memoizer() *memoize.Memoizer {
 	return w.memoizer
 }
 
-// Close releases cached resources owned by this WAF instance.
-// Cached entries shared with other WAF instances remain until all owners release them.
-// Transactions already in-flight are unaffected as they hold their own references.
+// Close releases cached resources and retires this WAF's audit writer.
+// Callers must stop creating transactions before calling Close. Existing
+// transactions retain the writer until their Close; the last one returns any
+// deferred writer close error. Repeated calls return the retained close error.
 func (w *WAF) Close() error {
 	w.closeOnce.Do(func() {
 		memoize.Release(w.memoizerID)
 	})
+	w.lifecycleMu.Lock()
+	defer w.lifecycleMu.Unlock()
+	w.closing = true
+	w.closeAuditWriter()
+	return w.closeErr
+}
+
+// closeAuditWriter requires lifecycleMu. Only initialized writers are owned here;
+// an Init that fails is responsible for releasing its own partially opened resources.
+func (w *WAF) closeAuditWriter() {
+	if w.closing && w.activeTransactions == 0 && !w.auditWriterClosed && w.auditLogWriterInitialized {
+		w.auditWriterClosed = true
+		w.closeErr = w.auditLogWriter.Close()
+	}
+}
+
+func (w *WAF) releaseTransaction() error {
+	w.lifecycleMu.Lock()
+	defer w.lifecycleMu.Unlock()
+	w.activeTransactions--
+	if w.closing && w.activeTransactions == 0 {
+		w.closeAuditWriter()
+		return w.closeErr
+	}
 	return nil
 }

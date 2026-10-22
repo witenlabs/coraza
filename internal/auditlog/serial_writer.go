@@ -1,5 +1,6 @@
 // Copyright 2022 Juan Pablo Tosso and the OWASP Coraza contributors
 // SPDX-License-Identifier: Apache-2.0
+// Modified by Witen Labs in 2026: return underlying audit sink write errors.
 
 package auditlog
 
@@ -59,8 +60,7 @@ func (sl *serialWriter) Write(al plugintypes.AuditLog) error {
 		return nil
 	}
 
-	sl.logger.Println(string(bts))
-	return nil
+	return sl.logger.Output(2, string(bts))
 }
 
 var _ plugintypes.AuditLogWriter = (*serialWriter)(nil)

@@ -1,0 +1,9 @@
+Witen Coraza core companion
+
+Derived from OWASP Coraza v3.8.1, licensed under the Apache License, Version 2.0.
+Original copyright notices and upstream history are retained.
+
+Witen Labs modifications (2026) address serial audit sink errors, audit writer
+retirement with pending transactions, failed construction cleanup and downstream
+qualification. This experimental branch does not imply endorsement by OWASP
+or upstream maintainers. See FORK.md for scope and qualification limits.

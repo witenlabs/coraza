@@ -1,17 +1,110 @@
 // Copyright 2022 Juan Pablo Tosso and the OWASP Coraza contributors
 // SPDX-License-Identifier: Apache-2.0
+// Modified by Witen Labs in 2026: cover audit ownership and draining close errors.
 
 package coraza
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/corazawaf/coraza/v3/experimental/plugins/plugintypes"
 	"github.com/corazawaf/coraza/v3/internal/corazawaf"
 	"github.com/corazawaf/coraza/v3/types"
 )
+
+type lifecycleAuditWriter struct {
+	closes atomic.Int64
+	writes atomic.Int64
+	err    error
+}
+
+func (*lifecycleAuditWriter) Init(plugintypes.AuditLogConfig) error { return nil }
+func (w *lifecycleAuditWriter) Write(plugintypes.AuditLog) error {
+	if w.closes.Load() != 0 {
+		return errors.New("write after audit writer closed")
+	}
+	w.writes.Add(1)
+	return nil
+}
+func (w *lifecycleAuditWriter) Close() error {
+	w.closes.Add(1)
+	return w.err
+}
+
+// Not a profile: this asserts ownership across WAF/transaction Close and failed construction.
+func TestAuditWriterLifecycle(t *testing.T) {
+	for _, pending := range []int{0, 8} {
+		for _, closeFails := range []bool{false, true} {
+			t.Run(fmt.Sprintf("pending=%d/error=%t", pending, closeFails), func(t *testing.T) {
+				writer := &lifecycleAuditWriter{}
+				if closeFails {
+					writer.err = errors.New("audit close failed")
+				}
+				config := NewWAFConfig().(*wafConfig)
+				config.auditLog = &auditLogConfig{writer: writer}
+				waf, err := NewWAF(config)
+				if err != nil {
+					t.Fatal(err)
+				}
+				txs := make([]types.Transaction, pending)
+				for i := range txs {
+					txs[i] = waf.NewTransaction()
+				}
+				closer := waf.(interface{ Close() error })
+				err = closer.Close()
+				if pending == 0 {
+					if !errors.Is(err, writer.err) || writer.closes.Load() != 1 {
+						t.Fatalf("immediate close: err=%v closes=%d", err, writer.closes.Load())
+					}
+				} else {
+					if err != nil || writer.closes.Load() != 0 {
+						t.Fatalf("closed before transactions drained: %v", err)
+					}
+					var wg sync.WaitGroup
+					var closeErrors atomic.Int64
+					for _, tx := range txs {
+						wg.Go(func() {
+							tx.ProcessLogging()
+							if err := tx.Close(); err != nil {
+								if !errors.Is(err, writer.err) {
+									t.Error(err)
+								}
+								closeErrors.Add(1)
+							}
+						})
+					}
+					wg.Wait()
+					wantErrors := int64(0)
+					if closeFails {
+						wantErrors = 1
+					}
+					if writer.writes.Load() != int64(pending) || writer.closes.Load() != 1 || closeErrors.Load() != wantErrors {
+						t.Fatalf("drain writes=%d closes=%d errors=%d", writer.writes.Load(), writer.closes.Load(), closeErrors.Load())
+					}
+				}
+				if err := closer.Close(); !errors.Is(err, writer.err) || writer.closes.Load() != 1 {
+					t.Fatalf("repeated close: err=%v closes=%d", err, writer.closes.Load())
+				}
+			})
+		}
+	}
+	t.Run("failed validation", func(t *testing.T) {
+		writer := &lifecycleAuditWriter{}
+		config := NewWAFConfig().WithRequestBodyLimit(0).(*wafConfig)
+		config.auditLog = &auditLogConfig{writer: writer}
+		if waf, err := NewWAF(config); err == nil || waf != nil {
+			t.Fatalf("invalid config accepted: %v %v", waf, err)
+		}
+		if writer.closes.Load() != 1 {
+			t.Fatalf("failed constructor retained audit writer: closes=%d", writer.closes.Load())
+		}
+	})
+}
 
 // wafWithRules mirrors experimental.WAFWithRules for testing without import cycle.
 type wafWithRules interface {

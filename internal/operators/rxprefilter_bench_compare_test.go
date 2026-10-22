@@ -147,4 +147,3 @@ func BenchmarkCompare(b *testing.B) {
 		b.Log(pat.name, "→ prefilter:", hasPF)
 	}
 }
-

@@ -1,5 +1,6 @@
 // Copyright 2024 Juan Pablo Tosso and the OWASP Coraza contributors
 // SPDX-License-Identifier: Apache-2.0
+// Modified by Witen Labs in 2026: release a retired WAF's audit writer after logging.
 
 package corazawaf
 
@@ -1752,11 +1753,14 @@ func (tx *Transaction) Close() error {
 			Msg("Transaction finished")
 	}
 
+	if err := tx.WAF.releaseTransaction(); err != nil {
+		errs = append(errs, fmt.Errorf("closing audit writer: %w", err))
+	}
 	if len(errs) == 0 {
 		return nil
 	}
 
-	return fmt.Errorf("transaction close failed: %v", errors.Join(errs...))
+	return fmt.Errorf("transaction close failed: %w", errors.Join(errs...))
 }
 
 // String will return a string with the transaction debug information

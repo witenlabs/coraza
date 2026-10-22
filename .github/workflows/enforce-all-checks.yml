@@ -13,6 +13,7 @@ permissions: {}
 
 jobs:
   enforce-all-checks:
+    if: github.repository == 'corazawaf/coraza'
     runs-on: ubuntu-latest
     permissions:
       checks: read

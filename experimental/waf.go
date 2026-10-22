@@ -1,5 +1,6 @@
 // Copyright 2024 Juan Pablo Tosso and the OWASP Coraza contributors
 // SPDX-License-Identifier: Apache-2.0
+// Modified by Witen Labs in 2026: document audit writer retirement.
 
 package experimental
 
@@ -26,9 +27,9 @@ type WAFWithRules interface {
 	RulesCount() int
 }
 
-// WAFCloser allows closing a WAF instance to release cached resources
-// such as compiled regex patterns. Transactions in-flight are unaffected
-// as they hold their own references to compiled objects.
+// WAFCloser retires a WAF's cached resources and audit writer. Stop creating new
+// transactions before calling Close. In-flight transactions keep their audit
+// writer until the last transaction Close, which returns any deferred close error.
 // This will be promoted to the public WAF interface in v4.
 type WAFCloser interface {
 	io.Closer

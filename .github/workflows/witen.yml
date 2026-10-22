@@ -1,0 +1,50 @@
+name: Witen core CI
+
+on:
+  push:
+    branches: [witen-v3.8.1, 'fix/**']
+  pull_request:
+    branches: [witen-v3.8.1]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: witen-core-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash {0}
+
+jobs:
+  verify:
+    if: github.repository == 'witenlabs/coraza'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: 1.26.10
+      - name: Workspace toolchain
+        run: go work edit -go=1.26.10
+      - name: Formatting
+        run: |
+          files=$(gofmt -l .) || exit 1
+          if [ -n "$files" ]; then printf '%s\n' "$files"; exit 1; fi
+      - name: Default race tests
+        run: go test -race -count=1 ./...
+      - name: Uncached race tests
+        run: go test -race -tags=coraza.no_memoize -count=1 ./...
+      - name: Engine and CRS matrix
+        run: go run mage.go test
+      - name: Vet
+        run: go vet ./...
+      - name: Lint
+        run: go run mage.go lint

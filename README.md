@@ -1,3 +1,9 @@
+# Witen Coraza core companion
+
+Experimental downstream patches for the Witen Caddy connector, based on Coraza
+3.8.1. See [FORK.md](FORK.md) for changes, build requirements and qualification
+limits. The upstream documentation follows; its badges describe upstream.
+
 <h1>
   <img src="https://coraza.io/images/logo_shield_only.png" align="left" height="46px" alt=""/>&nbsp;
   <span>Coraza - Web Application Firewall</span>

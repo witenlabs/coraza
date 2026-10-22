@@ -1,6 +1,7 @@
 module github.com/corazawaf/coraza/v3
 
-go 1.25.0
+// Witen qualification requires the patched Go toolchain.
+go 1.26.10
 
 // Testing dependencies:
 // - go-mockdns
