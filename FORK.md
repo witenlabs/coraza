@@ -1,8 +1,12 @@
 # Witen Coraza core companion
 
-This experimental downstream branch starts from Coraza `v3.8.1`
-(`9f8521398d1ff023b958fad0b944cac265763866`), the engine used by the Witen
-Caddy connector. Upstream main is retained separately. The Apache-2.0 license,
+This experimental downstream branch originally started from Coraza `v3.8.1`
+(`9f8521398d1ff023b958fad0b944cac265763866`). It now includes upstream main
+through `8538b97cc1d7b0cc03384704f1b5cfb035e4c83c` (November 11, 2026),
+including changes not yet in a tagged release. The historical branch name
+`witen-v3.8.1` is retained for existing consumers; it no longer describes the
+complete upstream baseline. Consumers must pin the exact qualified commit.
+Upstream main is retained separately. The Apache-2.0 license,
 history and attribution are preserved. This branch does not establish an upstream
 maintainer role, a stable release or a security support promise.
 
@@ -15,8 +19,9 @@ The narrow runtime changes are:
 - Close an initialized audit writer once when its WAF retires. Pending transactions
   retain it through logging and their own Close. The final transaction returns a
   deferred writer-close error; subsequent WAF Close calls retain that error.
-- Release resources when NewWAF fails. This follows the construction cleanup
-  already present on upstream main in `2080714`; the release predates that fix.
+- Release resources when NewWAF fails, including an initialized audit writer.
+  Upstream's constructor cleanup from `2080714` is now included; the downstream
+  writer ownership and transaction draining behavior remain necessary.
 
 Stop creating transactions before WAF Close. Every transaction must be closed
 exactly once, after ProcessLogging, as required by the transaction pooling API.
