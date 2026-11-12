@@ -1,3 +1,7 @@
+// Copyright 2026 The OWASP Coraza contributors
+// SPDX-License-Identifier: Apache-2.0
+// Modified by Witen Labs in 2026: normalize the CRS test import ordering.
+
 //go:build coraza.rule.rx_prefilter
 
 // rxprefilter_crs_test.go: correctness and benchmark tests driven entirely by
@@ -32,8 +36,8 @@ import (
 	"strings"
 	"testing"
 
-	coreruleset "github.com/corazawaf/coraza-coreruleset/crs/v4"
 	crstests "github.com/corazawaf/coraza-coreruleset/crs/tests/v4"
+	coreruleset "github.com/corazawaf/coraza-coreruleset/crs/v4"
 )
 
 // ---------------------------------------------------------------------------
