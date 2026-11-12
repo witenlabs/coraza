@@ -41,7 +41,8 @@ The separate file-backed pmFromFile cache issue is unchanged. Qualified connecto
 builds continue to require `coraza.no_memoize`. Rules, redacting formatters,
 Warden ingestion, health canaries and enforcement policy remain outside core.
 
-CI uses Go 1.26.10. Run the default and no_memoize race suites, the full CRS tag
+CI uses Go 1.26.11, including the HTTP server fix for GO-2026-6859. Run the
+default and no_memoize race suites, the full CRS tag
 matrix, vet and lint before publishing a candidate. Passing these focused gates
 does not qualify TinyGo/WASM/FIPS or a production rollout. The engine's retained
 upstream automation is restricted to upstream; only Witen's verification workflow
